@@ -1,58 +1,57 @@
+
 from flask import Flask, jsonify, request
 from datetime import datetime
 import os
 import paho.mqtt.client as mqtt
-
 
 app = Flask(__name__)
 
 # Get port from environment variable or choose 9099 as local default
 port = int(os.getenv("PORT", 9099))
 
-# The callback for when the client receives a CONNACK response from the server.
-def on_connect(client, userdata, flags, rc):
+client = None
+message = None
+action = None
+name = None
+
+
+def connect(client, userdata, flags, rc):
     print("Connected with result code "+str(rc))
+    client.subscribe('light')
 
-    # Subscribing in on_connect() means that if we lose the connection and
-    # reconnect then subscriptions will be renewed.
-    client.subscribe("light")
-
-# The callback for when a PUBLISH message is received from the server.
-def on_message(client, userdata, msg):
+def inmessage(client,userdata,msg):
     print(msg.topic+" "+str(msg.payload))
+    message = str(msg.payload)
+        
 
+def networking_init():
 
- 
+    global client
+    client = mqtt.Client('homeTest')
+    client.on_connect = connect
+    client.on_message = inmessage
 
+    client.connect('broker.mqttdashboard.com')
+    
 
+    
 
-
-#Main App Route (First function run when site is accessed)
 @app.route('/')
-
 def main():
-    name = request.args.get("command")
-    action = request.args.get("info")
 
-    client = mqtt.Client()
-    client.on_connect = on_connect
-    client.on_message = on_message
-
+    networking_init()
+    global name, action
+    name = request.args.get("name")
+    action = request.args.get("action")
 
 
-    client.connect("broker.mqttdashboard.com") 
-
-    
-# Blocking call that processes network traffic, dispatches callbacks and
-# handles reconnecting.
-# Other loop*() functions are available that give a threaded interface and a
-# manual interface.
-    client.loop_forever()
-    
-
-   
-
-
+    print(name)
+    if(action != ""):
+        client.publish('light',name)
+        client.loop()
+        return 'command done'
+    else:
+        return message
 
 
 
